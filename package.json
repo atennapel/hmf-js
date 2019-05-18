@@ -1,0 +1,20 @@
+{
+  "name": "hmf-js",
+  "version": "1.0.0",
+  "description": "Implementation of \"HMF: Simple Type Inference for First-Class Polymorphism\" in Javascript.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/atennapel/hmf-js.git"
+  },
+  "author": "Albert ten Napel",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/atennapel/hmf-js/issues"
+  },
+  "homepage": "https://github.com/atennapel/hmf-js#readme"
+}
