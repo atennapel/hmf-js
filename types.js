@@ -55,7 +55,8 @@ const isMono = ty => {
   if (ty.tag === 'TForall') return false;
   if (ty.tag === 'TApp') return isMono(ty.left) && isMono(ty.right);
   return true;
-}
+};
+const isSigma = ty => ty.tag === 'TForall';
 
 const substTVar = (map, ty) => {
   if (ty.tag === 'TVar')
@@ -143,6 +144,7 @@ module.exports = {
 
   prune,
   isMono,
+  isSigma,
 
   substTVar,
   substTVars,

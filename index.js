@@ -1,7 +1,7 @@
 const {
   Abs, Var, App, showTerm, Ann,
 } = require('./terms');
-const { infer } = require('./inferRigid');
+const { infer } = require('./inferRigidOpt');
 const {
   showType,
   TForall,

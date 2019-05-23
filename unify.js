@@ -4,7 +4,7 @@ const { terr } = require('./util');
 
 const matchfun = ty => {
   const rho = instantiate(ty);
-  const m = matchTFun(rho);
+  const m = matchTFun(prune(rho));
   if (m) return m;
   if (m.tag === 'TMeta') {
     const a = freshTMeta();
