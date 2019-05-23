@@ -1,6 +1,8 @@
 const TForall = (tvs, type) => ({ tag: 'TForall', tvs, type });
 const TCon = name => ({ tag: 'TCon', name });
 const TApp = (left, right) => ({ tag: 'TApp', left, right });
+const tappFrom = ts => ts.reduce(TApp);
+function tapp() { return tappFrom(Array.from(arguments)) }
 const TMeta = id => ({ tag: 'TMeta', id, type: null });
 const TVar = id => ({ tag: 'TVar', id });
 const TSkol = id => ({ tag: 'TSkol', id });
@@ -12,6 +14,8 @@ const matchTFun = ty => {
     return { left: ty.left.right, right: ty.right };
   return null;
 };
+const tfunFrom = ts => ts.reduceRight((x, y) => TFun(y, x));
+function tfun() { return tfunFrom(Array.from(arguments)) }
 
 const Annot = (tvs, type) => ({ tvs, type });
 const annotAny = Annot([0], TVar(0));
@@ -28,11 +32,27 @@ const showAnnot = a =>
   a.tvs.length === 0 ? showType(a.type) :
   `exists ${a.tvs.join(' ')}. ${showType(a.type)}`;
 
+const flattenTFun = t => {
+  let c = t;
+  let m = matchTFun(c);
+  const r = [];
+  while (m) {
+    r.push(m.left);
+    c = m.right;
+    m = matchTFun(m.right);
+  }
+  r.push(c);
+  return r;
+};
+
 const showType = t => {
   if (t.tag === 'TCon') return t.name;
   if (t.tag === 'TMeta') return `?${t.id}`;
   if (t.tag === 'TVar') return `'${t.id}`;
   if (t.tag === 'TSkol') return `\$${t.id}`;
+  const m = matchTFun(t);
+  if (m)
+    return `(${flattenTFun(t).map(showType).join(' -> ')})`;
   if (t.tag === 'TApp')
     return `(${showType(t.left)} ${showType(t.right)})`;
   if (t.tag === 'TForall')
@@ -124,12 +144,18 @@ module.exports = {
   TForall,
   TCon,
   TApp,
+  tappFrom,
+  tapp,
   TMeta,
   TVar,
   TSkol,
+
   tFun,
   TFun,
   matchTFun,
+  tfunFrom,
+  tfun,
+
   Annot,
   annotAny,
 

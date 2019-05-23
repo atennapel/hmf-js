@@ -10,6 +10,16 @@ const Let = (name, val, body) =>
 const Ann = (term, annot) => ({ tag: 'Ann', term, annot });
 const Rigid = term => ({ tag: 'Rigid', term });
 
+const appFrom = ts => ts.reduce(App);
+function app() { return appFrom(Array.from(arguments)) }
+
+const abs = (ns, body) => ns.reduceRight((b, n) => Abs(n, b), body);
+const aabs = (ns, body) =>
+  ns.reduceRight((b, [n, t]) => AAbs(n, t, b), body);
+
+const lets = (vals, body) =>
+  vals.reduceRight((b, [n, t]) => Let(n, t, b), body);
+
 const isAnnot = t =>
   (t.tag === 'Let' && isAnnot(t.body)) ||
   t.tag === 'Rigid' || t.tag === 'Ann';
@@ -50,4 +60,9 @@ module.exports = {
   isAnnot,
   showTerm,
   flattenApp,
+  app,
+  appFrom,
+  abs,
+  aabs,
+  lets,
 };

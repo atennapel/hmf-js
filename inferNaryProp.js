@@ -15,7 +15,8 @@ const maybeInstOrGen = (ex, env, ty) =>
 
 const infer = (env, term) => {
   resetId();
-  return prune(synth(null, Gen, env, term));
+  const ty = synth(null, Gen, env, term);
+  return prune(ty);
 };
 
 const extend = (n, t, e) => {
@@ -35,7 +36,7 @@ const synth = (prop, ex, env, term) => {
   }
   if (term.tag === 'Abs') {
     const [proparg, _, __] = propFun(prop);
-    synth(
+    return synth(
       prop,
       ex,
       env,
