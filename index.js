@@ -1,7 +1,7 @@
 const {
   Abs, Var, App, showTerm, Ann,
 } = require('./terms');
-const { infer } = require('./inferNary');
+const { infer } = require('./inferNaryProp');
 const {
   showType,
   TForall,
@@ -25,8 +25,8 @@ const env = {
   head: TForall([0], TFun(TApp(tlist, TVar(0)), TVar(0))),
 };
 
-const term = Ann(App(Var('singleton'), Var('id')), Annot([], TForall([], TApp(tlist, tid))));
+const term = Ann(App(Var('singleton'), Var('id')), Annot([], TApp(tlist, tid)));
+// const term = App(Var('singleton'), Var('id'));
 console.log(showTerm(term));
 const ty = infer(env, term);
 console.log(showType(ty));
-
