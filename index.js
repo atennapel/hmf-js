@@ -1,7 +1,7 @@
 const {
-  Abs, Var, App, showTerm
+  Abs, Var, App, showTerm, Ann,
 } = require('./terms');
-const { infer } = require('./inferBasic');
+const { infer } = require('./inferRigid');
 const {
   showType,
   TForall,
@@ -9,6 +9,7 @@ const {
   TVar,
   TCon,
   TApp,
+  Annot,
 } = require('./types');
 
 const tid = TForall([0], TFun(TVar(0), TVar(0)));
@@ -20,9 +21,11 @@ const env = {
   auto: TFun(tid, tid),
   ids: TApp(tlist, tid),
   map: TForall([0, 1], TFun(TFun(TVar(0), TVar(1)), TFun(TApp(tlist, TVar(0)), TApp(tlist, TVar(1))))),
+  singleton: TForall([0], TFun(TVar(0), TApp(tlist, TVar(0)))),
+  head: TForall([0], TFun(TApp(tlist, TVar(0)), TVar(0))),
 };
 
-const term = App(App(Var('map'), Var('auto')), Var('ids'));
+const term = Ann(App(Var('singleton'), Var('id')), Annot([], TForall([], TApp(tlist, tid))));
 console.log(showTerm(term));
 const ty = infer(env, term);
 console.log(showType(ty));
