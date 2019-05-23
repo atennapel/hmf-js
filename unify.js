@@ -15,6 +15,26 @@ const matchfun = ty => {
   return terr(`applying non-function: ${showType(ty)}`);
 };
 
+const matchfunN = (ty, n) => {
+  const { left, right } = matchfun(ty);
+  return matchfunNR(n, [left], right);
+};
+const matchfunNR = (n, args, res) => {
+  if (args.length < n) {
+    if (res.tag === 'TForall') return [args, res];
+    if (res.tag === 'TMeta') {
+      if (res.type) return matchfunNR(n, args, res.type);
+      return [args, res];
+    }
+    const m = matchTFun(res);
+    if (m) {
+      args.push(m.left);
+      return matchfunNR(n, args, m.right);
+    }return terr(`n-ary function match failed: ${n} ; ${args.map(showType).join(' -> ')} ; ${showType(res)}`);
+  }
+  return [args, res];
+};
+
 const subsume = (a, b) => {
   const [sks, rho1] = skolemize(a);
   const rho2 = instantiate(b);
@@ -61,6 +81,7 @@ const unifyTMeta = (tv, t) => {
 
 module.exports = {
   matchfun,
+  matchfunN,
   subsume,
   unify,
 };

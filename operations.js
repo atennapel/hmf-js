@@ -1,4 +1,5 @@
 const { freshTMeta, substTVars, freshTSkol, freeTMeta, freeTMetaInEnv, prune, freshId, TForall, TVar } = require('./types');
+const { isAnnot } = require('./terms');
 
 const instantiate = ty => {
   const t = prune(ty);
@@ -37,9 +38,31 @@ const generalize = (env, tyy) => {
   return TForall(ftvs, prune(ty));
 };
 
+const pickArg = tps => {
+  const [[tpar, arg], rest] = pickAnnot([], tps, tps);
+  return [prune(tpar), arg, rest];
+};
+const pickAnnot = (acc, ts, all) => {
+  if (ts.length === 0) return pickNonTVar([], all, all);
+  const [_, arg] = ts[0];
+  if (isAnnot(arg)) return [ts[0], acc.concat(ts.slice(1))];
+  acc.push(ts[0]);
+  return pickAnnot(acc, ts.slice(1), all);
+};
+const pickNonTVar = (acc, ts, all) => {
+  if (ts.length === 0) return [all[0], all.slice(1)];
+  const [tpar, _] = ts[0];
+  if (tpar.tag === 'TMeta' && !tpar.type) {
+    acc.push(ts[0]);
+    return pickNonTVar(acc, ts.slice(1), all);
+  }
+  return [ts[0], acc.concat(ts.slice(1))];
+};
+
 module.exports = {
   instantiate,
   instantiateAnnot,
   skolemize,
   generalize,
+  pickArg,
 };

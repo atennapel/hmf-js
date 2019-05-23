@@ -27,7 +27,17 @@ const showTerm = t => {
     return `(${showTerm(t.term)} : ${showAnnot(t.annot)})`;
   if (t.tag === 'Rigid')
     return `(rigid ${showTerm(t.term)})`;
-}
+};
+
+const flattenApp = t => {
+  const args = [];
+  let c = t;
+  while (c.tag === 'App') {
+    args.push(c.right);
+    c = c.left;
+  }
+  return [c, args.reverse()];
+};
 
 module.exports = {
   Var,
@@ -39,4 +49,5 @@ module.exports = {
   Rigid,
   isAnnot,
   showTerm,
+  flattenApp,
 };
