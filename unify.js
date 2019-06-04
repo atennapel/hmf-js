@@ -26,6 +26,7 @@ const unifyTMeta = (m, t) => {
   m.type = t;
 };
 const unify = (t1, t2) => {
+  console.log(`unify ${showType(t1)} ~ ${showType(t2)}`);
   if (t1 === t2) return;
   if (t1.tag === 'TMeta') return unifyTMeta(t1, t2);
   if (t2.tag === 'TMeta') return unifyTMeta(t2, t1);
@@ -48,11 +49,12 @@ const unify = (t1, t2) => {
 };
 
 const subsume = (t1, t2) => {
+  console.log(`subsume ${showType(t1)} <: ${showType(t2)}`);
   const rho1 = instantiate(t1);
   const [sks, rho2] = skolemize(t2);
   unify(rho1, rho2);
   if (occursTSkol(sks, prune(t1)) || occursTSkol(sks, prune(t2)))
-    return terr(`skolem check fail [${sks.join(' ')}] in ${showType(t1)} <: ${showType(t2)}`);
+    return terr(`skolem check fail [${sks.map(showType).join(' ')}] in ${showType(prune(t1))} <: ${showType(prune(t2))}`);
 };
 
 const matchfun = ty => {
@@ -68,6 +70,7 @@ const matchfun = ty => {
 
 const generalize = (env, tyy) => {
   const ty = prune(tyy);
+  console.log(`generalize ${showType(tyy)}`);
   const tms = freeTMeta(ty);
   const envtms = freeTMetaInEnv(env);
   const gtms = [];

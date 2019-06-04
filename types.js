@@ -5,7 +5,7 @@ const resetId = () => { id = 0 };
 const TCon = name => ({ tag: 'TCon', name });
 const TVar = id => ({ tag: 'TVar', id });
 const TMeta = id => ({ tag: 'TMeta', id, type: null });
-const TSkol = id => ({ tag: 'TVar', id });
+const TSkol = id => ({ tag: 'TSkol', id });
 const TApp = (left, right) => ({ tag: 'TApp', left, right });
 const TForall = (ids, type) => ({ tag: 'TForall', ids, type });
 
@@ -33,7 +33,7 @@ const showType = t => {
   if (isTFun(t))
     return `(${showType(tfunLeft(t))} -> ${showType(tfunRight(t))})`;
   if (t.tag === 'TApp')
-    return `${showType(t.left)} ${showType(t.right)}`;
+    return `(${showType(t.left)} ${showType(t.right)})`;
   if (t.tag === 'TForall')
     return `(forall ${t.ids.join(' ')}. ${showType(t.type)})`;
 };

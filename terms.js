@@ -2,7 +2,7 @@ const { showType } = require('./types');
 
 const Var = name => ({ tag: 'Var', name });
 const App = (left, right) => ({ tag: 'App', left, right });
-const Abs = (name, body) => ({ tag: 'Abs', name, body });
+const Abs = (name, body, type = null) => ({ tag: 'Abs', name, type, body });
 const Ann = (term, type) => ({ tag: 'Ann', term, type });
 
 const appFrom = ts => ts.reduce(App);
@@ -13,7 +13,10 @@ const showTerm = t => {
   if (t.tag === 'Var') return `${t.name}`;
   if (t.tag === 'App')
     return `(${showTerm(t.left)} ${showTerm(t.right)})`;
-  if (t.tag === 'Abs') return `(\\${t.name} -> ${showTerm(t.body)})`;
+  if (t.tag === 'Abs')
+    return t.type ?
+    ` (\\(${t.name} : ${showType(t.type)}) -> ${showTerm(t.body)})` :
+      `(\\${t.name} -> ${showTerm(t.body)})`;
   if (t.tag === 'Ann')
     return `(${showTerm(t.term)} : ${showType(t.type)})`;
 };
