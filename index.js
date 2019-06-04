@@ -36,6 +36,7 @@ const env = {
   tail: TForall([0], tfun(tapp(tList, tv(0)), tapp(tList, tv(0)))),
   Nil: TForall([0], tapp(tList, tv(0))),
   Cons: TForall([0], tfun(tv(0), tapp(tList, tv(0)), tapp(tList, tv(0)))),
+  snoc: TForall([0], tfun(tapp(tList, tv(0)), tv(0), tapp(tList, tv(0)))),
   append: TForall([0], tfun(tapp(tList, tv(0)), tapp(tList, tv(0)), tapp(tList, tv(0)))),
   length: TForall([0], tfun(tapp(tList, tv(0)), tInt)),
   inc: tfun(tInt, tInt),
@@ -50,7 +51,7 @@ const env = {
   flip: TForall([0, 1, 2], tfun(tfun(tv(0), tv(1), tv(2)), tv(1), tv(0), tv(2))),
   runST: TForall([0], tfun(TForall([1], tapp(tST, tv(1), tv(0))), tv(0))),
   argST: TForall([0], tapp(tST, tv(0), tInt)),
-  f: TForall([0], tfun(tfun(tv(0), tv(0))), tapp(tList, tv(0)), tv(0)),
+  f: TForall([0], tfun(tfun(tv(0), tv(0)), tapp(tList, tv(0)), tv(0))),
   g: TForall([0], tfun(tapp(tList, tv(0)), tapp(tList, tv(0))), tv(0)),
   h: tfun(tInt, tid),
   k: TForall([0], tfun(tv(0), tapp(tList, tv(0)), tv(0))),
@@ -58,21 +59,28 @@ const env = {
   r: tfun(TForall([0], tfun(tv(0), TForall([1], tfun(tv(1), tv(1))))), tInt),
 };
 
-const term = app(v('r'), abs(['x', 'y'], v('y')));
+const term = app(v('Cons'), v('id'), v('ids'));
+// const term = Ann(abs(['x'], v('x')), tid);
 console.log(showTerm(term));
-const ty = infer(env, term);
-console.log(showType(ty));
+try {
+  const ty = infer(env, term);
+  console.log(showType(ty));
+} catch (err) {
+  console.log(err);
+}
 
 /**
- * Problems:
- *  choose Nil ids
+ * Type annotation should succeed:
  *  choose (id : tid -> tid) auto2
- *  f (choose (id : tid -> tid)) ids
+ *
+ * Also fails in HMF:
  *  Cons id ids
  *  Cons (\x -> x) ids
  *  g (single id) ids
- *  revapp id poly
- *  revapp argST runST
  *  k (\x -> h x) lst
  *  r (\x y -> y)
+ *
+ * Fixed by n-ary:
+ *  revapp id poly
+ *  Cons id ids
  */

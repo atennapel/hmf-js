@@ -94,6 +94,7 @@ const occursTSkol = (m, t) => {
 };
 
 const instantiate = ty => {
+  console.log(`instantiate ${showType(ty)}`);
   const t = prune(ty);
   if (t.tag !== 'TForall') return t;
   const tvs = t.ids.map(() => freshTMeta());
@@ -101,6 +102,7 @@ const instantiate = ty => {
 };
 
 const skolemize = ty => {
+  console.log(`skolemize ${showType(ty)}`);
   const t = prune(ty);
   if (t.tag !== 'TForall') return [[], t];
   const tvs = t.ids.map(() => freshTSkol());
