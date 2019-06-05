@@ -17,16 +17,16 @@ const {
   instantiate,
   generalize,
 } = require('./unify');
-const { showTerm } = require('./terms');
-const { Nil, Cons, extend, lookup, toString } = require('./list');
+const { showTerm, flattenApp } = require('./terms');
+const { Nil, extend, lookup } = require('./list');
 
 const infer = (env, term) => {
   resetId();
-  return prune(synth(env, Nil, term, Nil));
+  return prune(synth(env, Nil, term));
 };
 
-const synth = (env, lenv, term, args) => {
-  console.log(`synth ${showTerm(term)} - ${toString(args, showTerm)}`);
+const synth = (env, lenv, term) => {
+  console.log(`synth ${showTerm(term)}`);
   if (term.tag === 'Var') {
     const ty = lookup(lenv, term.name) || env[term.name];
     if (!ty) return terr(`undefined var ${term.name}`);
@@ -34,12 +34,12 @@ const synth = (env, lenv, term, args) => {
   }
   if (term.tag === 'Abs') {
     if (term.type) {
-      const ty = synth(env, extend(term.name, term.type, lenv), term.body, Nil);
+      const ty = synth(env, extend(term.name, term.type, lenv), term.body);
       const rty = term.body.tag === 'Ann' ? ty : instantiate(ty);
       return generalize(env, TFun(term.type, rty));
     } else {
       const tv = freshTMeta();
-      const ty = synth(env, extend(term.name, tv, lenv), term.body, Nil);
+      const ty = synth(env, extend(term.name, tv, lenv), term.body);
       const tp = prune(tv);
       if (!isMono(tp))
         return terr(`infered poly type for abstraction (${showType(tp)}) in ${showTerm(term)}`);
@@ -47,34 +47,27 @@ const synth = (env, lenv, term, args) => {
       return generalize(env, TFun(tp, rty));
     }
   }
-  if (term.tag === 'App') {
-    const ty1 = synth(env, lenv, term.left, Cons(term.right, args));
-    const fun = matchfun(ty1);
-    check(env, lenv, term.right, tfunLeft(fun), Nil);
-    return generalize(env, tfunRight(fun));
-  }
   if (term.tag === 'Ann') {
-    check(env, lenv, term.term, term.type, args);
+    check(env, lenv, term.term, term.type);
     return prune(term.type);
+  }
+  if (term.tag === 'App') {
+    const [fn, args] = flattenApp(term);
+    const ft = synth(env, lenv, fn);
+    console.log(`${showType(ft)} @ [${args.map(showTerm).join(', ')}]`);
+    return terr('unimplemented app');
   }
 };
 
-const check = (env, lenv, term, type, args) => {
+const check = (env, lenv, term, type) => {
   console.log(`check ${showTerm(term)} : ${showType(type)}`);
   if (term.tag === 'Abs') {
     const tf = matchfun(type);
     if (term.type) unify(tfunLeft(tf), term.type);
-    check(env, extend(term.name, tfunLeft(tf), lenv), term.body, tfunRight(tf), Nil);
+    check(env, extend(term.name, tfunLeft(tf), lenv), term.body, tfunRight(tf));
     return;
   }
-  if (term.tag === 'App') {
-    const ty1 = synth(env, lenv, term.left, Cons(term.right, args));
-    const fun = matchfun(ty1);
-    subsume(tfunRight(fun), type);
-    check(env, lenv, term.right, tfunLeft(fun), Nil);
-    return generalize(env, tfunRight(fun));
-  }
-  const ty = synth(env, lenv, term, args);
+  const ty = synth(env, lenv, term);
   if (term.tag === 'Ann')
     unify(ty, type);
   else

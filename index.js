@@ -59,7 +59,7 @@ const env = {
   r: tfun(TForall([0], tfun(tv(0), TForall([1], tfun(tv(1), tv(1))))), tInt),
 };
 
-const term = app(v('Cons'), v('id'), v('ids'));
+const term = Ann(app(v('Cons'), v('id'), v('ids')), tid);
 // const term = Ann(abs(['x'], v('x')), tid);
 console.log(showTerm(term));
 try {
