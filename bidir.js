@@ -96,6 +96,15 @@ const showTerm = t => {
     return `(${showTerm(t.term)} : ${showType(t.type)})`;
 };
 
+const flattenApp = t => {
+  const r = [];
+  while (t.tag === 'App') {
+    r.push(t.right);
+    t = t.left;
+  }
+  return [t, r.reverse()];
+};
+
 // context
 const Marker = id => ({ tag: 'Marker', id });
 const context = [];
@@ -304,7 +313,10 @@ const synth = (env, term) => {
     return term.type;
   }
   if (term.tag === 'App') {
-    const ty = synth(env, term.left);
+    const [f, as] = flattenApp(term);
+    const ty = synth(env, f);
+    const a = collectArgs(inst(ty), as);
+    console.log(a);
     return synthapp(env, ty, term.right);
   }
   if (term.tag === 'Abs') {
@@ -359,6 +371,24 @@ const synthapp = (env, type, term) => {
   return terr(`cannot synthapp ${showType(type)} @ ${showTerm(term)}`);
 };
 
+const collectArgs = (f, args, res = []) => {
+  if (args.length === 0) return [res, f, args];
+  if (f.tag === 'TMeta') {
+    if (f.type) return collectArgs(f, args, res);
+    const a = freshTMeta();
+    const b = freshTMeta();
+    f.type = TFun(a, b);
+    const arg = args.shift();
+    res.push([arg, a]);
+    return collectArgs(b, args, res);
+  }
+  if (isTFun(f)) {
+    const arg = args.shift();
+
+  }
+  
+};
+
 // testing
 const v = Var;
 const tv = TVar;
@@ -376,7 +406,7 @@ const List = TCon('List');
 const env = list(
   ['singleton', tforall([0], tfun(tv(0), tapp(List, tv(0))))],
 );
-const term = Ann(app(v('singleton'), abs(['x'], v('x'))), tapp(List, tid));
+const term = app(v('singleton'), abs(['x'], v('x')));
 console.log(showTerm(term));
 const ty = infer(term, env);
 console.log(showType(ty));
