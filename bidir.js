@@ -30,6 +30,7 @@ const showType = t => {
   if (t.tag === 'TForall')
     return `(forall ${t.id}. ${showType(t.type)})`;
 };
+const showTypeP = t => showType(prune(t));
 
 const prune = t => {
   if (t.tag === 'TMeta')
@@ -83,13 +84,14 @@ const isMono = t => {
 
 // terms
 const Var = name => ({ tag: 'Var', name });
-const Abs = (name, body) => ({ tag: 'Abs', name, body });
+const Abs = (name, body, type = null) => ({ tag: 'Abs', name, type, body });
 const App = (left, right) => ({ tag: 'App', left, right });
 const Ann = (term, type) => ({ tag: 'Ann', term, type });
 
 const showTerm = t => {
   if (t.tag === 'Var') return t.name;
-  if (t.tag === 'Abs') return `(\\${t.name} -> ${showTerm(t.body)})`;
+  if (t.tag === 'Abs')
+    return t.type ? `(\\(${t.name} : ${showType(t.type)}) -> ${showTerm(t.body)})` : `(\\${t.name} -> ${showTerm(t.body)})`;
   if (t.tag === 'App')
     return `(${showTerm(t.left)} ${showTerm(t.right)})`;
   if (t.tag === 'Ann')
@@ -149,7 +151,7 @@ const solve = (x, i, t) => {
   context.splice(i, 1);
 };
 const unifyTMeta = (x, t) => {
-  console.log(`unifyTMeta ${showType(x)} := ${showType(t)} | ${showContext()}`);
+  // console.log(`unifyTMeta ${showType(x)} := ${showType(t)} | ${showContext()}`);
   if (x === t) return;
   if (x.type) return unify(x.type, t);
   const i = context.indexOf(x);
@@ -169,7 +171,7 @@ const unifyTMeta = (x, t) => {
     return solve(x, i, t);
   }
   if (hasTMeta(x, t))
-    return terr(`occurs check failed ${showType(x)} := ${showType(t)}`);
+    return terr(`occurs check failed ${showType(x)} := ${showTypeP(t)}`);
   if (t.tag === 'TApp') {
     const a = TMeta(freshId());
     const b = TMeta(freshId());
@@ -188,10 +190,10 @@ const unifyTMeta = (x, t) => {
     drop(m);
     return;
   }
-  return terr(`unification failed ${showType(x)} := ${showType(t)}`);
+  return terr(`unification failed ${showType(x)} := ${showTypeP(t)}`);
 };
 const unify = (a, b) => {
-  console.log(`unify ${showType(a)} ~ ${showType(b)} | ${showContext()}`);
+  // console.log(`unify ${showType(a)} ~ ${showType(b)} | ${showContext()}`);
   if (a === b) return;
   if (a.tag === 'TMeta') return unifyTMeta(a, b);
   if (b.tag === 'TMeta') return unifyTMeta(b, a);
@@ -209,7 +211,7 @@ const unify = (a, b) => {
   }
   if (a.tag === 'TCon' && b.tag === 'TCon' && a.name === b.name) return;
   if (a.tag === 'TVar' && b.tag === 'TVar' && a.id === b.id) return;
-  return terr(`unification failed ${showType(a)} ~ ${showType(b)}`);
+  return terr(`unification failed ${showTypeP(a)} ~ ${showTypeP(b)}`);
 };
 
 const inst = t => {
@@ -229,10 +231,10 @@ const skol = t => {
   return t;
 };
 const subsume = (a, b) => {
-  console.log(`subsume ${showType(a)} <: ${showType(b)} | ${showContext()}`);
-  const ta = inst(a);
+  // console.log(`subsume ${showTypeP(a)} <: ${showTypeP(b)} | ${showContext()}`);
   const m = mark();
   const tb = skol(b);
+  const ta = inst(a);
   unify(ta, tb);
   drop(m);
 };
@@ -301,7 +303,7 @@ const infer = (t, env = Nil) => {
 };
 
 const synth = (env, term) => {
-  console.log(`synth ${showTerm(term)}`);
+  // console.log(`synth ${showTerm(term)}`);
   if (term.tag === 'Var') {
     const t = lookup(term.name, env);
     if (!t) return terr(`undefined var ${term.name}`);
@@ -315,22 +317,22 @@ const synth = (env, term) => {
   if (term.tag === 'App') {
     const [f, as] = flattenApp(term);
     const ty = synth(env, f);
-    const a = collectArgs(inst(ty), as);
-    console.log(a);
-    return synthapp(env, ty, term.right);
+    const m = mark();
+    const res = synthapp(env, ty, as);
+    return generalize(m, res);
   }
   if (term.tag === 'Abs') {
-    const a = freshTMeta();
+    const a = term.type || freshTMeta();
     const m = mark();
     const ty = synth(extend(term.name, a, env), term.body);
-    if (a.type && !isMono(a.type))
-      return terr(`poly type infered for abstraction argument ${showTerm(term)}: ${showType(a.type)}`);
+    if (a.tag === 'TMeta' && a.type && !isMono(a.type))
+      return terr(`poly type infered for abstraction argument ${showTerm(term)}: ${showTypeP(a.type)}`);
     return generalize(m, TFun(a, ty));
   }
   return terr(`cannot synth ${showTerm(term)}`);
 };
 const check = (env, term, type) => {
-  console.log(`check ${showTerm(term)} : ${showType(type)}`);
+  // console.log(`check ${showTerm(term)} : ${showType(type)}`);
   if (type.tag === 'TForall') {
     const m = mark();
     const tv = freshTVar();
@@ -339,36 +341,45 @@ const check = (env, term, type) => {
     return;
   }
   if (term.tag === 'Abs' && isTFun(type)) {
+    if (term.type) subsume(term.type, tfunL(type));
     const m = mark();
     check(extend(term.name, tfunL(type), env), term.body, tfunR(type));
     drop(m);
     return;
   }
+  if (term.tag === 'App') {
+    const [f, as] = flattenApp(term);
+    const ty = synth(env, f);
+    synthapp(env, ty, as, type);
+    return;
+  }
   const ty = synth(env, term);
   subsume(ty, type);
 };
-const synthapp = (env, type, term) => {
-  console.log(`synthapp ${showType(type)} @ ${showTerm(term)}`);
-  if (type.tag === 'TForall') {
-    const tm = freshTMeta();
-    return synthapp(env, substTVar(type.id, tm, type.type), term);
+const isTMeta = t => t.tag === 'TMeta' && (!t.type || isTMeta(t.type));
+const synthapp = (env, type, args, extype) => {
+  // console.log(`synthapp ${showType(type)} @ [${args.map(showTerm).join(', ')}]${extype ? ` : ${showType(extype)}` : ''}`);
+  if (args.length === 0) return type;
+  const [pars, ret, resargs] = collectArgs(inst(type), args);
+  if (extype && resargs.length === 0) subsume(ret, extype);
+  while (pars.length > 0) {
+    let found = false;
+    for (let i = 0, l = pars.length; i < l; i++) {
+      const [arg, party] = pars[i];
+      if (!isTMeta(party)) {
+        found = true;
+        pars.splice(i, 1);
+        check(env, arg, party);
+        break;
+      }
+    }
+    if (!found) {
+      const [arg, party] = pars.shift();
+      check(env, arg, party);
+    }
   }
-  if (isTFun(type)) {
-    check(env, term, tfunL(type));
-    return tfunR(type);
-  }
-  if (type.tag === 'TMeta') {
-    if (type.type) return synthapp(env, type.type, term);
-    const i = context.indexOf(type);
-    if (i < 0) return terr(`undefined tmeta ${showType(type)}`);
-    const a = TMeta();
-    const b = TMeta();
-    replace(i, [b, a]);
-    type.type = TFun(a, b);
-    check(env, term, a);
-    return b;
-  }
-  return terr(`cannot synthapp ${showType(type)} @ ${showTerm(term)}`);
+
+  return synthapp(env, ret, resargs);
 };
 
 const collectArgs = (f, args, res = []) => {
@@ -384,9 +395,10 @@ const collectArgs = (f, args, res = []) => {
   }
   if (isTFun(f)) {
     const arg = args.shift();
-
+    res.push([arg, tfunL(f)]);
+    return collectArgs(tfunR(f), args, res);
   }
-  
+  return [res, f, args];
 };
 
 // testing
@@ -402,12 +414,58 @@ function tfun() { return tfunFrom(Array.from(arguments)) }
 
 const tid = tforall([0], tfun(tv(0), tv(0)));
 const List = TCon('List');
+const Bool = TCon('Bool');
+const Nat = TCon('Nat');
+const Pair = TCon('Pair');
 
 const env = list(
+  ['true', Bool],
+  ['zero', Nat],
   ['singleton', tforall([0], tfun(tv(0), tapp(List, tv(0))))],
+  ['const', tforall([0, 1], tfun(tv(0), tv(1), tv(0)))],
+  ['id', tid],
+  ['ids', tapp(List, tid)],
+  ['Nil', tforall([0], tapp(List, tv(0)))],
+  ['Cons', tforall([0], tfun(tv(0), tapp(List, tv(0)), tapp(List, tv(0))))],
+  ['choose', tforall([0], tfun(tv(0), tv(0), tv(0)))],
+  ['auto', tfun(tid, tid)],
+  ['auto2', tforall([0], tfun(tid, tv(0), tv(0)))],
+  ['f', tforall([0], tfun(tfun(tv(0), tv(0)), tapp(List, tv(0)), tv(0)))],
+  ['poly', tfun(tid, tapp(Pair, Nat, Bool))],
+  ['Pair', tforall([0, 1], tfun(tv(0), tv(1), tapp(Pair, tv(0), tv(1))))],
+  ['head', tforall([0], tfun(tapp(List, tv(0)), tv(0)))],
 );
-const term = app(v('singleton'), abs(['x'], v('x')));
-console.log(showTerm(term));
-const ty = infer(term, env);
-console.log(showType(ty));
-console.log(showTerm(term));
+
+const terms = [
+  // A
+  abs(['x'], v('x')),
+  abs(['x', 'y'], v('x')),
+  app(v('choose'), v('id')),
+  app(v('choose'), v('Nil'), v('ids')),
+  Abs('x', app(v('x'), v('x')), tid),
+  app(v('id'), v('auto')),
+  app(v('id'), v('auto2')),
+  app(v('choose'), v('id'), v('auto')),
+  app(v('choose'), v('id'), v('auto2')),
+  app(v('choose'), Ann(v('id'), tfun(tid, tid)), v('auto2')), // X
+  app(v('f'), app(v('choose'), v('id')), v('ids')),
+  app(v('f'), app(v('choose'), Ann(v('id'), tfun(tid, tid))), v('ids')), // X
+  app(v('poly'), v('id')),
+  app(v('poly'), abs(['x'], v('x'))),
+  app(v('id'), v('poly'), abs(['x'], v('x'))), // X
+  // B
+  abs(['f'], app(v('Pair'), app(v('f'), v('zero')), app(v('f'), v('true')))),
+  Abs('f', app(v('Pair'), app(v('f'), v('zero')), app(v('f'), v('true'))), tid),
+  abs(['xs'], app(v('poly'), app(v('head'), v('xs')))),
+  Abs('xs', app(v('poly'), app(v('head'), v('xs'))), tapp(List, tid)), // X
+  // C
+  // D
+  // E
+];
+terms.forEach(t => {
+  try {
+    console.log(`${showTerm(t)} => ${showType(infer(t, env))}`);
+  } catch (err) {
+    console.log(`${showTerm(t)} => ${err}`);
+  }
+});
