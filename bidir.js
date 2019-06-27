@@ -421,7 +421,7 @@ const Pair = TCon('Pair');
 const env = list(
   ['true', Bool],
   ['zero', Nat],
-  ['singleton', tforall([0], tfun(tv(0), tapp(List, tv(0))))],
+  ['single', tforall([0], tfun(tv(0), tapp(List, tv(0))))],
   ['const', tforall([0, 1], tfun(tv(0), tv(1), tv(0)))],
   ['id', tid],
   ['ids', tapp(List, tid)],
@@ -434,6 +434,14 @@ const env = list(
   ['poly', tfun(tid, tapp(Pair, Nat, Bool))],
   ['Pair', tforall([0, 1], tfun(tv(0), tv(1), tapp(Pair, tv(0), tv(1))))],
   ['head', tforall([0], tfun(tapp(List, tv(0)), tv(0)))],
+  ['length', tforall([0], tfun(tapp(List, tv(0)), Nat))],
+  ['tail', tforall([0], tfun(tapp(List, tv(0)), tapp(List, tv(0))))],
+  ['append', tforall([0], tfun(tapp(List, tv(0)), tapp(List, tv(0)), tapp(List, tv(0))))],
+  ['inc', tfun(Nat, Nat)],
+  ['g', tforall([0], tfun(tapp(List, tv(0)), tapp(List, tv(0)), tv(0)))],
+  ['map', tforall([0, 1], tfun(tfun(tv(0), tv(1)), tapp(List, tv(0)), tapp(List, tv(1))))],
+  ['app', tforall([0, 1], tfun(tfun(tv(0), tv(1)), tv(0), tv(1)))],
+  ['revapp', tforall([0, 1], tfun(tv(0), tfun(tv(0), tv(1)), tv(1)))],
 );
 
 const terms = [
@@ -459,8 +467,26 @@ const terms = [
   abs(['xs'], app(v('poly'), app(v('head'), v('xs')))),
   Abs('xs', app(v('poly'), app(v('head'), v('xs'))), tapp(List, tid)), // X
   // C
+  app(v('length'), v('ids')),
+  app(v('tail'), v('ids')),
+  app(v('head'), v('ids')),
+  app(v('single'), v('ids')),
+  app(v('Cons'), v('id'), v('ids')),
+  app(v('Cons'), abs(['x'], v('x')), v('ids')), // X
+  app(v('append'), app(v('single'), v('inc')), app(v('single'), v('id'))),
+  app(v('g'), app(v('single'), v('id')), v('ids')),
+  app(v('map'), v('poly'), app(v('single'), v('id'))),
+  app(v('map'), v('head'), app(v('single'), v('ids'))),
   // D
+  app(v('app'), v('poly'), v('id')),
+  app(v('revapp'), v('id'), v('poly')),
+  app(v('runST'), v('argST')),
+  app(v('app'), v('runST'), v('argST')),
+  app(v('revapp'), v('argST'), v('runST')),
   // E
+  // k h list
+  // k (\x. h x) lst
+  // r (\x y. y)
 ];
 terms.forEach(t => {
   try {
