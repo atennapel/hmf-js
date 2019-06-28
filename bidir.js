@@ -236,7 +236,7 @@ const skol = t => {
 const subsume = (a, b) => {
   if (log) console.log(`subsume ${showTypeP(a)} <: ${showTypeP(b)} | ${showContext()}`);
   const m = mark();
-  const tb = isTMeta(a) ? b : skol(b);
+  const tb = skol(b);
   const ta = inst(a);
   unify(ta, tb);
   drop(m);
@@ -329,8 +329,8 @@ const synth = (env, term) => {
     const a = term.type || freshTMeta();
     const m = mark();
     const ty = synth(extend(term.name, a, env), term.body);
-    if (a.tag === 'TMeta' && a.type && !isMono(a.type))
-      return terr(`poly type infered for abstraction argument ${showTerm(term)}: ${showTypeP(a.type)}`);
+    // if (a.tag === 'TMeta' && a.type && !isMono(a.type))
+    // return terr(`poly type infered for abstraction argument ${showTerm(term)}: ${showTypeP(a.type)}`);
     return generalize(m, TFun(a, inst(ty)));
   }
   return terr(`cannot synth ${showTerm(term)}`);
@@ -366,7 +366,8 @@ const synthapp = (env, type, args, extype) => {
   if (log) console.log(`synthapp ${showType(type)} @ [${args.map(showTerm).join(', ')}]${extype ? ` : ${showTypeP(extype)}` : ''}`);
   if (args.length === 0) return type;
   const [pars, ret, resargs] = collectArgs(inst(type), args);
-  if (extype && resargs.length === 0) subsume(ret, extype);
+  if (extype && resargs.length === 0)
+    (isTMeta(ret) ? unify : subsume)(ret, extype);
   while (pars.length > 0) {
     let found = false;
     for (let i = 0, l = pars.length; i < l; i++) {
