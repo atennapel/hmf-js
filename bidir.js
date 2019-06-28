@@ -1,4 +1,5 @@
 const terr = msg => { throw new TypeError(msg) };
+let log = true;
 
 // names
 let _id = 0;
@@ -82,6 +83,8 @@ const isMono = t => {
   return true;
 };
 
+const isTMeta = t => t.tag === 'TMeta' && (!t.type || isTMeta(t.type));
+
 // terms
 const Var = name => ({ tag: 'Var', name });
 const Abs = (name, body, type = null) => ({ tag: 'Abs', name, type, body });
@@ -151,7 +154,7 @@ const solve = (x, i, t) => {
   context.splice(i, 1);
 };
 const unifyTMeta = (x, t) => {
-  // console.log(`unifyTMeta ${showType(x)} := ${showType(t)} | ${showContext()}`);
+  if (log) console.log(`unifyTMeta ${showType(x)} := ${showType(t)} | ${showContext()}`);
   if (x === t) return;
   if (x.type) return unify(x.type, t);
   const i = context.indexOf(x);
@@ -193,7 +196,7 @@ const unifyTMeta = (x, t) => {
   return terr(`unification failed ${showType(x)} := ${showTypeP(t)}`);
 };
 const unify = (a, b) => {
-  // console.log(`unify ${showType(a)} ~ ${showType(b)} | ${showContext()}`);
+  if (log) console.log(`unify ${showType(a)} ~ ${showType(b)} | ${showContext()}`);
   if (a === b) return;
   if (a.tag === 'TMeta') return unifyTMeta(a, b);
   if (b.tag === 'TMeta') return unifyTMeta(b, a);
@@ -231,9 +234,9 @@ const skol = t => {
   return t;
 };
 const subsume = (a, b) => {
-  // console.log(`subsume ${showTypeP(a)} <: ${showTypeP(b)} | ${showContext()}`);
+  if (log) console.log(`subsume ${showTypeP(a)} <: ${showTypeP(b)} | ${showContext()}`);
   const m = mark();
-  const tb = skol(b);
+  const tb = isTMeta(a) ? b : skol(b);
   const ta = inst(a);
   unify(ta, tb);
   drop(m);
@@ -297,13 +300,14 @@ const generalize = (m, t) => {
 };
 
 const infer = (t, env = Nil) => {
+  resetId();
   const m = mark();
   const ty = synth(env, t);
   return prune(generalize(m, ty));
 };
 
 const synth = (env, term) => {
-  // console.log(`synth ${showTerm(term)}`);
+  if (log) console.log(`synth ${showTerm(term)}`);
   if (term.tag === 'Var') {
     const t = lookup(term.name, env);
     if (!t) return terr(`undefined var ${term.name}`);
@@ -327,19 +331,14 @@ const synth = (env, term) => {
     const ty = synth(extend(term.name, a, env), term.body);
     if (a.tag === 'TMeta' && a.type && !isMono(a.type))
       return terr(`poly type infered for abstraction argument ${showTerm(term)}: ${showTypeP(a.type)}`);
-    return generalize(m, TFun(a, ty));
+    return generalize(m, TFun(a, inst(ty)));
   }
   return terr(`cannot synth ${showTerm(term)}`);
 };
 const check = (env, term, type) => {
-  // console.log(`check ${showTerm(term)} : ${showType(type)}`);
-  if (type.tag === 'TForall') {
-    const m = mark();
-    const tv = freshTVar();
-    check(env, term, substTVar(type.id, tv, type.type));
-    drop(m);
-    return;
-  }
+  if (log) console.log(`check ${showTerm(term)} : ${showTypeP(type)}`);
+  if (type.tag === 'TMeta' && type.type)
+    return check(env, term, type.type);
   if (term.tag === 'Abs' && isTFun(type)) {
     if (term.type) subsume(term.type, tfunL(type));
     const m = mark();
@@ -353,12 +352,18 @@ const check = (env, term, type) => {
     synthapp(env, ty, as, type);
     return;
   }
+  if (type.tag === 'TForall') {
+    const m = mark();
+    const tv = freshTVar();
+    check(env, term, substTVar(type.id, tv, type.type));
+    drop(m);
+    return;
+  }
   const ty = synth(env, term);
   subsume(ty, type);
 };
-const isTMeta = t => t.tag === 'TMeta' && (!t.type || isTMeta(t.type));
 const synthapp = (env, type, args, extype) => {
-  // console.log(`synthapp ${showType(type)} @ [${args.map(showTerm).join(', ')}]${extype ? ` : ${showType(extype)}` : ''}`);
+  if (log) console.log(`synthapp ${showType(type)} @ [${args.map(showTerm).join(', ')}]${extype ? ` : ${showTypeP(extype)}` : ''}`);
   if (args.length === 0) return type;
   const [pars, ret, resargs] = collectArgs(inst(type), args);
   if (extype && resargs.length === 0) subsume(ret, extype);
@@ -417,6 +422,7 @@ const List = TCon('List');
 const Bool = TCon('Bool');
 const Nat = TCon('Nat');
 const Pair = TCon('Pair');
+const ST = TCon('ST');
 
 const env = list(
   ['true', Bool],
@@ -442,6 +448,12 @@ const env = list(
   ['map', tforall([0, 1], tfun(tfun(tv(0), tv(1)), tapp(List, tv(0)), tapp(List, tv(1))))],
   ['app', tforall([0, 1], tfun(tfun(tv(0), tv(1)), tv(0), tv(1)))],
   ['revapp', tforall([0, 1], tfun(tv(0), tfun(tv(0), tv(1)), tv(1)))],
+  ['runST', tforall([0], tfun(tforall([1], tapp(ST, tv(1), tv(0))), tv(0)))],
+  ['argST', tforall([0], tapp(ST, tv(0), Nat))],
+  ['h', tfun(Nat, tforall([0], tfun(tv(0), tv(0))))],
+  ['k', tforall([0], tfun(tv(0), tapp(List, tv(0)), tv(0)))],
+  ['lst', tapp(List, tforall([0], tfun(Nat, tv(0), tv(0))))],
+  ['r', tfun(tforall([0], tfun(tv(0), tforall([1], tfun(tv(1), tv(1))))), Nat)],
 );
 
 const terms = [
@@ -455,24 +467,24 @@ const terms = [
   app(v('id'), v('auto2')),
   app(v('choose'), v('id'), v('auto')),
   app(v('choose'), v('id'), v('auto2')),
-  app(v('choose'), Ann(v('id'), tfun(tid, tid)), v('auto2')), // X
+  app(v('choose'), Ann(v('id'), tfun(tid, tid)), v('auto2')), // ?
   app(v('f'), app(v('choose'), v('id')), v('ids')),
-  app(v('f'), app(v('choose'), Ann(v('id'), tfun(tid, tid))), v('ids')), // X
+  app(v('f'), Ann(app(v('choose'), v('id')), tfun(tid, tid)), v('ids')),
   app(v('poly'), v('id')),
   app(v('poly'), abs(['x'], v('x'))),
-  app(v('id'), v('poly'), abs(['x'], v('x'))), // X
+  app(v('id'), v('poly'), abs(['x'], v('x'))),
   // B
   abs(['f'], app(v('Pair'), app(v('f'), v('zero')), app(v('f'), v('true')))),
   Abs('f', app(v('Pair'), app(v('f'), v('zero')), app(v('f'), v('true'))), tid),
   abs(['xs'], app(v('poly'), app(v('head'), v('xs')))),
-  Abs('xs', app(v('poly'), app(v('head'), v('xs'))), tapp(List, tid)), // X
+  Abs('xs', app(v('poly'), app(v('head'), v('xs'))), tapp(List, tid)),
   // C
   app(v('length'), v('ids')),
   app(v('tail'), v('ids')),
   app(v('head'), v('ids')),
   app(v('single'), v('ids')),
   app(v('Cons'), v('id'), v('ids')),
-  app(v('Cons'), abs(['x'], v('x')), v('ids')), // X
+  app(v('Cons'), abs(['x'], v('x')), v('ids')),
   app(v('append'), app(v('single'), v('inc')), app(v('single'), v('id'))),
   app(v('g'), app(v('single'), v('id')), v('ids')),
   app(v('map'), v('poly'), app(v('single'), v('id'))),
@@ -484,10 +496,12 @@ const terms = [
   app(v('app'), v('runST'), v('argST')),
   app(v('revapp'), v('argST'), v('runST')),
   // E
-  // k h list
-  // k (\x. h x) lst
-  // r (\x y. y)
+  app(v('k'), v('h'), v('lst')),
+  app(v('k'), abs(['x'], app(v('h'), v('x'))), v('lst')),
+  app(v('r'), abs(['x', 'y'], v('y'))),
 ];
+
+log = false;
 terms.forEach(t => {
   try {
     console.log(`${showTerm(t)} => ${showType(infer(t, env))}`);
@@ -495,3 +509,10 @@ terms.forEach(t => {
     console.log(`${showTerm(t)} => ${err}`);
   }
 });
+
+/*
+const term = Ann(app(v('head'), v('ids')), tid);
+//const term = abs(['x'], app(v('h'), v('x')));
+console.log(showType(infer(term, env)));
+console.log(showTerm(term));
+*/
